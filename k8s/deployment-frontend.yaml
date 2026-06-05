@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: admin-portal-frontend
+  namespace: greyvetro
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: admin-portal-frontend
+  template:
+    metadata:
+      labels:
+        app: admin-portal-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: greyvetro/admin-portal-frontend:latest
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi

@@ -1,0 +1,55 @@
+name: Deploy Admin Portal
+
+on:
+  push:
+    branches: [main]
+
+env:
+  NAMESPACE: greyvetro
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AKS credentials
+        uses: azure/aks-set-context@v4
+        with:
+          resource-group: ${{ secrets.AKS_RESOURCE_GROUP }}
+          cluster-name: ${{ secrets.AKS_CLUSTER_NAME }}
+          creds: ${{ secrets.AKS_CREDENTIALS }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: true
+          tags: greyvetro/admin-portal-backend:${{ github.sha }}
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          push: true
+          tags: greyvetro/admin-portal-frontend:${{ github.sha }}
+
+      - name: Create client secret
+        run: |
+          kubectl create secret generic admin-portal-secrets \
+            --from-literal=client-secret=${{ secrets.ADMIN_PORTAL_CLIENT_SECRET }} \
+            --namespace=$NAMESPACE \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy
+        run: |
+          kubectl set image deployment/admin-portal-backend \
+            backend=greyvetro/admin-portal-backend:${{ github.sha }} \
+            --namespace=$NAMESPACE
+          kubectl set image deployment/admin-portal-frontend \
+            frontend=greyvetro/admin-portal-frontend:${{ github.sha }} \
+            --namespace=$NAMESPACE
+
+      - name: Apply ingress and services
+        run: kubectl apply -f k8s/

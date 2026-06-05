@@ -1,0 +1,45 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: admin-portal
+  namespace: greyvetro
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "128k"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - admin.greyvetro.local
+      secretName: admin-portal-tls
+  rules:
+    - host: admin.greyvetro.local
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: admin-portal-backend
+                port:
+                  number: 8000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: admin-portal-frontend
+                port:
+                  number: 80
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: admin-portal-tls
+  namespace: greyvetro
+spec:
+  secretName: admin-portal-tls
+  issuerRef:
+    name: greyvetro-ca-issuer
+    kind: ClusterIssuer
+  dnsNames:
+    - admin.greyvetro.local
