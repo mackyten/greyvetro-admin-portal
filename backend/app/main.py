@@ -30,14 +30,14 @@ def health():
 
 
 @app.get("/api/roles")
-async def list_roles(_: TokenUser = Depends(require_role("OrgManager"))):
+async def list_roles(_: TokenUser = Depends(require_role("SuperAdmin"))):
     """All realm roles except Keycloak internals."""
     roles = get_keycloak_admin().get_realm_roles()
     return [r for r in roles if not r["name"].startswith("default") and r["name"] not in ("offline_access", "uma_authorization")]
 
 
 @app.get("/api/stats")
-async def stats(_: TokenUser = Depends(require_role("OrgManager"))):
+async def stats(_: TokenUser = Depends(require_role("SuperAdmin"))):
     kc = get_keycloak_admin()
     all_users = kc.get_users()
     all_groups = kc.get_groups()

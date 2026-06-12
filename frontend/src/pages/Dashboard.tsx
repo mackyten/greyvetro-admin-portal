@@ -14,7 +14,7 @@ interface Stats {
 
 const S: Record<string, React.CSSProperties> = {
   topbar:    { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 22 },
-  h1:        { fontSize: 20, fontWeight: 700, letterSpacing: '-0.03em' },
+  h1:        { fontSize: 20, fontWeight: 700, letterSpacing: '-0.03em', whiteSpace: 'nowrap' as const },
   sub:       { fontSize: 12.5, color: 'var(--gv-ink-2)', marginTop: 2 },
   kpis:      { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 18 },
   card:      { background: 'var(--gv-card)', border: '1px solid var(--gv-line)', borderRadius: 'var(--gv-r-card)', boxShadow: 'var(--gv-shadow)' },
@@ -23,7 +23,7 @@ const S: Record<string, React.CSSProperties> = {
   kpiIc:     { width: 24, height: 24, borderRadius: 7, display: 'grid', placeItems: 'center', flexShrink: 0 },
   kpiVal:    { fontSize: 28, fontWeight: 750, letterSpacing: '-0.035em', margin: '10px 0 4px' },
   kpiSub:    { fontSize: 11, color: 'var(--gv-ink-3)' },
-  bottom:    { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 },
+  bottom:    { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, width: '100%' },
   panelH:    { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px 10px' },
   panelHt:   { fontSize: 14, fontWeight: 700, letterSpacing: '-0.02em' },
   panelMeta: { fontSize: 11.5, color: 'var(--gv-ink-3)', fontWeight: 500 },

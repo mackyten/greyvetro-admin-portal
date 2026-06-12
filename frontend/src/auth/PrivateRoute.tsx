@@ -11,7 +11,7 @@ export function PrivateRoute({ children, requiredRole }: Props) {
 
   if (!initialized) return <div>Loading...</div>;
   if (!isAuthenticated) return <Navigate to="/unauthorized" replace />;
-  if (requiredRole && !hasRole(requiredRole)) return <Navigate to="/unauthorized" replace />;
+  if (requiredRole && !hasRole(requiredRole) && !hasRole('SuperAdmin')) return <Navigate to="/unauthorized" replace />;
 
   return <>{children}</>;
 }

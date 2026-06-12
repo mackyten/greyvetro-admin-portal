@@ -3,11 +3,12 @@ import { NavLink } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 
 const S: Record<string, React.CSSProperties> = {
-  app:   { display: 'grid', gridTemplateColumns: '220px 1fr', minHeight: '100vh' },
+  app:   { display: 'flex', minHeight: '100vh' },
   side:  {
     background: 'var(--gv-dark-bg)', color: 'var(--gv-dark-ink)',
     padding: '18px 12px', display: 'flex', flexDirection: 'column',
-    gap: 2, position: 'fixed', top: 0, left: 0, width: 220, height: '100vh', overflowY: 'auto',
+    gap: 2, width: 220, minWidth: 220, minHeight: '100vh', overflowY: 'auto',
+    position: 'sticky', top: 0, alignSelf: 'flex-start', height: '100vh',
   },
   brand: { display: 'flex', alignItems: 'center', gap: 10, padding: '4px 10px 18px' },
   mark:  {
@@ -34,7 +35,7 @@ const S: Record<string, React.CSSProperties> = {
     border: 0, background: 'transparent', color: 'var(--gv-dark-muted)',
     fontSize: 11, cursor: 'pointer', padding: '2px 0',
   },
-  main: { marginLeft: 220, padding: '22px 26px 32px', minHeight: '100vh' },
+  main: { flex: 1, minWidth: 0, padding: '22px 26px 32px' },
 };
 
 interface NavItemProps { to: string; icon: ReactNode; label: string; }
