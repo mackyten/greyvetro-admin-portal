@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import apiClient from '../api/client';
 import Layout from '../components/Layout';
+import ConfirmModal from '../components/ConfirmModal';
 import { useAuth } from '../auth/useAuth';
 
 interface KcUser {
@@ -80,6 +81,9 @@ export default function Users() {
   const [roleModal, setRoleModal]   = useState<RoleModalState | null>(null);
   const [form, setForm]         = useState<CreateForm>(EMPTY_FORM);
   const [saving, setSaving]     = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [pageError, setPageError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<KcUser | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -111,30 +115,56 @@ export default function Users() {
 
   async function handleCreate() {
     if (!form.username || !form.email || !form.password) return;
+    if (form.password.length < 12) {
+      setCreateError('Password must be at least 12 characters.');
+      return;
+    }
     setSaving(true);
+    setCreateError(null);
     try {
       await apiClient.post('/api/users', form);
       setShowCreate(false);
       setForm(EMPTY_FORM);
       await load();
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail ?? 'Failed to create user.';
+      setCreateError(typeof msg === 'string' ? msg : JSON.stringify(msg));
     } finally { setSaving(false); }
   }
 
   async function handleToggle(u: KcUser) {
-    await apiClient.put(`/api/users/${u.id}`, { enabled: !u.enabled });
-    await load();
+    try {
+      await apiClient.put(`/api/users/${u.id}`, { enabled: !u.enabled });
+      await load();
+    } catch {
+      setPageError(`Failed to ${u.enabled ? 'disable' : 'enable'} user "${u.username}". Please try again.`);
+    }
   }
 
   async function handleDelete(u: KcUser) {
-    if (!confirm(`Delete user "${u.username}"? This cannot be undone.`)) return;
-    await apiClient.delete(`/api/users/${u.id}`);
-    await load();
+    setConfirmDelete(u);
+  }
+
+  async function confirmDeleteUser() {
+    if (!confirmDelete) return;
+    try {
+      await apiClient.delete(`/api/users/${confirmDelete.id}`);
+      setConfirmDelete(null);
+      await load();
+    } catch {
+      setConfirmDelete(null);
+      setPageError(`Failed to delete user "${confirmDelete.username}". Please try again.`);
+    }
   }
 
   async function handleSaveRoles(userId: string, roles: string[]) {
-    await apiClient.put(`/api/users/${userId}/roles`, { roles });
-    setRoleModal(null);
-    await load();
+    try {
+      await apiClient.put(`/api/users/${userId}/roles`, { roles });
+      setRoleModal(null);
+      await load();
+    } catch {
+      setPageError('Failed to update roles. Please try again.');
+    }
   }
 
   function toggleFormRole(r: string) {
@@ -155,6 +185,13 @@ export default function Users() {
           </button>
         )}
       </div>
+
+      {pageError && (
+        <div style={{ marginBottom: 14, padding: '10px 14px', borderRadius: 8, background: 'var(--gv-bad-wash)', color: 'var(--gv-bad)', fontSize: 12.5, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          {pageError}
+          <button onClick={() => setPageError(null)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--gv-bad)', fontSize: 14, lineHeight: 1, padding: '0 2px' }}>✕</button>
+        </div>
+      )}
 
       <div style={S.card}>
         <div style={S.toolbar}>
@@ -230,9 +267,14 @@ export default function Users() {
           <div style={S.modal}>
             <div style={S.mHead}>
               <span style={S.mTitle}>Create New User</span>
-              <button style={{ border: 0, background: 'none', cursor: 'pointer', color: 'var(--gv-ink-3)', fontSize: 18 }} onClick={() => { setShowCreate(false); setForm(EMPTY_FORM); }}>✕</button>
+              <button style={{ border: 0, background: 'none', cursor: 'pointer', color: 'var(--gv-ink-3)', fontSize: 18 }} onClick={() => { setShowCreate(false); setForm(EMPTY_FORM); setCreateError(null); }}>✕</button>
             </div>
             <div style={S.mBody}>
+              {createError && (
+                <div style={{ marginBottom: 14, padding: '9px 12px', borderRadius: 8, background: 'var(--gv-bad-wash)', color: 'var(--gv-bad)', fontSize: 12.5, fontWeight: 600 }}>
+                  {createError}
+                </div>
+              )}
               <div style={S.row2}>
                 <div style={S.field}>
                   <label style={S.label}>First Name</label>
@@ -271,7 +313,7 @@ export default function Users() {
               </div>
             </div>
             <div style={S.mFoot}>
-              <button style={S.btn} onClick={() => { setShowCreate(false); setForm(EMPTY_FORM); }}>Cancel</button>
+              <button style={S.btn} onClick={() => { setShowCreate(false); setForm(EMPTY_FORM); setCreateError(null); }}>Cancel</button>
               <button style={S.btnPri} onClick={handleCreate} disabled={saving}>{saving ? 'Creating…' : 'Create User'}</button>
             </div>
           </div>
@@ -285,6 +327,16 @@ export default function Users() {
           currentRoles={roleModal.currentRoles}
           onSave={handleSaveRoles}
           onClose={() => setRoleModal(null)}
+        />
+      )}
+
+      {confirmDelete && (
+        <ConfirmModal
+          title={`Delete @${confirmDelete.username}?`}
+          message="This permanently removes the user from Keycloak. This cannot be undone."
+          confirmLabel="Delete User"
+          onConfirm={confirmDeleteUser}
+          onCancel={() => setConfirmDelete(null)}
         />
       )}
     </Layout>

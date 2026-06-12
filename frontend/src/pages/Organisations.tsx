@@ -1,6 +1,7 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import apiClient from '../api/client';
 import Layout from '../components/Layout';
+import ConfirmModal from '../components/ConfirmModal';
 import { useAuth } from '../auth/useAuth';
 
 interface KcGroup { id: string; name: string; path: string; subGroups?: KcGroup[]; }
@@ -44,6 +45,8 @@ export default function Organisations() {
   const [newOrgName, setNewOrgName]   = useState('');
   const [saving, setSaving]           = useState(false);
   const [addUserId, setAddUserId]     = useState('');
+  const [error, setError]             = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<KcGroup | null>(null);
 
   const loadOrgs = useCallback(async () => {
     setLoading(true);
@@ -68,6 +71,7 @@ export default function Organisations() {
   useEffect(() => { loadOrgs(); }, [loadOrgs]);
 
   useEffect(() => {
+    setError(null);
     if (selected) loadMembers(selected);
     else { setMembers([]); setAllUsers([]); }
   }, [selected, loadMembers]);
@@ -84,23 +88,41 @@ export default function Organisations() {
   }
 
   async function handleDelete(org: KcGroup) {
-    if (!confirm(`Delete organisation "${org.name}"? This removes the group but not its members.`)) return;
-    await apiClient.delete(`/api/organisations/${org.id}`);
-    if (selected?.id === org.id) setSelected(null);
-    await loadOrgs();
+    setConfirmDelete(org);
+  }
+
+  async function confirmDeleteOrg() {
+    if (!confirmDelete) return;
+    try {
+      await apiClient.delete(`/api/organisations/${confirmDelete.id}`);
+      if (selected?.id === confirmDelete.id) setSelected(null);
+      setConfirmDelete(null);
+      await loadOrgs();
+    } catch {
+      setConfirmDelete(null);
+      setError('Failed to delete organisation. Please try again.');
+    }
   }
 
   async function handleAddMember() {
     if (!selected || !addUserId) return;
-    await apiClient.post(`/api/organisations/${selected.id}/members/${addUserId}`, {});
-    setAddUserId('');
-    await loadMembers(selected);
+    try {
+      await apiClient.post(`/api/organisations/${selected.id}/members/${addUserId}`, {});
+      setAddUserId('');
+      await loadMembers(selected);
+    } catch {
+      setError('Failed to add member. Please try again.');
+    }
   }
 
   async function handleRemoveMember(userId: string) {
     if (!selected) return;
-    await apiClient.delete(`/api/organisations/${selected.id}/members/${userId}`);
-    await loadMembers(selected);
+    try {
+      await apiClient.delete(`/api/organisations/${selected.id}/members/${userId}`);
+      await loadMembers(selected);
+    } catch {
+      setError('Failed to remove member. Please try again.');
+    }
   }
 
   const nonMembers = allUsers.filter(u => !members.some(m => m.id === u.id));
@@ -169,19 +191,19 @@ export default function Organisations() {
                   <span style={{ fontSize: 11, color: 'var(--gv-ink-3)', marginLeft: 8 }}>{members.length} members</span>
                 </div>
                 {isSuperAdmin && nonMembers.length > 0 && (
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <select
-                      value={addUserId}
-                      onChange={e => setAddUserId(e.target.value)}
-                      style={{ height: 32, border: '1px solid var(--gv-line)', borderRadius: 9, padding: '0 10px', fontSize: 12, color: 'var(--gv-ink)', background: 'var(--gv-bg)' }}
-                    >
-                      <option value="">Add user…</option>
-                      {nonMembers.map(u => <option key={u.id} value={u.id}>@{u.username}</option>)}
-                    </select>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <UserCombobox users={nonMembers} value={addUserId} onChange={setAddUserId} />
                     <button style={S.btnPri} onClick={handleAddMember} disabled={!addUserId}>Add</button>
                   </div>
                 )}
               </div>
+
+              {error && (
+                <div style={{ margin: '10px 16px 0', padding: '9px 12px', borderRadius: 8, background: 'var(--gv-bad-wash)', color: 'var(--gv-bad)', fontSize: 12.5, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  {error}
+                  <button onClick={() => setError(null)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--gv-bad)', fontSize: 14, lineHeight: 1, padding: '0 2px' }}>✕</button>
+                </div>
+              )}
 
               <table style={S.table}>
                 <thead>
@@ -248,6 +270,98 @@ export default function Organisations() {
           </div>
         </div>
       )}
+      {confirmDelete && (
+        <ConfirmModal
+          title={`Delete "${confirmDelete.name}"?`}
+          message="This removes the Keycloak group but does not delete its members."
+          confirmLabel="Delete Organisation"
+          onConfirm={confirmDeleteOrg}
+          onCancel={() => setConfirmDelete(null)}
+        />
+      )}
     </Layout>
+  );
+}
+
+function UserCombobox({ users, value, onChange }: {
+  users: KcUser[];
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const selected = users.find(u => u.id === value);
+
+  const filtered = query.trim()
+    ? users.filter(u =>
+        u.username.toLowerCase().includes(query.toLowerCase()) ||
+        u.email?.toLowerCase().includes(query.toLowerCase())
+      )
+    : users;
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  function pick(u: KcUser) {
+    onChange(u.id);
+    setQuery('');
+    setOpen(false);
+  }
+
+  function clear() {
+    onChange('');
+    setQuery('');
+  }
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <div style={{ display: 'flex', alignItems: 'center', height: 32, border: '1px solid var(--gv-line)', borderRadius: 9, background: 'var(--gv-bg)', overflow: 'hidden', minWidth: 220 }}>
+        <input
+          value={open || !selected ? query : `@${selected.username}`}
+          onChange={e => { setQuery(e.target.value); onChange(''); setOpen(true); }}
+          onFocus={() => { setQuery(''); setOpen(true); }}
+          placeholder="Search user…"
+          style={{ flex: 1, height: '100%', border: 'none', background: 'transparent', padding: '0 10px', fontSize: 12, color: 'var(--gv-ink)', outline: 'none' }}
+        />
+        {value && (
+          <button onClick={clear} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--gv-ink-3)', padding: '0 8px', fontSize: 14, lineHeight: 1 }}>✕</button>
+        )}
+      </div>
+
+      {open && (
+        <div style={{ position: 'absolute', top: 36, right: 0, minWidth: 260, maxHeight: 220, overflowY: 'auto', background: '#fff', border: '1px solid var(--gv-line)', borderRadius: 10, boxShadow: 'var(--gv-shadow-lg)', zIndex: 50 }}>
+          {filtered.length === 0 && (
+            <div style={{ padding: '10px 14px', fontSize: 12, color: 'var(--gv-ink-3)' }}>No users found.</div>
+          )}
+          {filtered.map(u => (
+            <div
+              key={u.id}
+              onMouseDown={() => pick(u)}
+              style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 12px', cursor: 'pointer', transition: 'background .1s' }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--gv-bg)')}
+              onMouseLeave={e => (e.currentTarget.style.background = '')}
+            >
+              <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'linear-gradient(135deg,var(--gv-brand-2),var(--gv-brand))', display: 'grid', placeItems: 'center', color: '#fff', fontWeight: 700, fontSize: 10, flexShrink: 0 }}>
+                {(u.firstName?.[0] ?? u.username[0]).toUpperCase()}
+              </div>
+              <div>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--gv-ink)' }}>
+                  {u.firstName} {u.lastName}
+                  <span style={{ fontWeight: 400, color: 'var(--gv-ink-3)', marginLeft: 5 }}>@{u.username}</span>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--gv-ink-3)' }}>{u.email}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from typing import Optional
+from keycloak.exceptions import KeycloakPostError
 
 from app.auth.dependencies import get_current_user, require_role
 from app.auth.keycloak import get_keycloak_admin
@@ -51,15 +52,18 @@ async def get_user(user_id: str, _: TokenUser = Depends(require_role("OrgManager
 @router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_user(payload: CreateUserPayload, _: TokenUser = Depends(require_role("SuperAdmin"))):
     kc = get_keycloak_admin()
-    user_id = kc.create_user({
-        "username": payload.username,
-        "email": payload.email,
-        "firstName": payload.firstName,
-        "lastName": payload.lastName,
-        "enabled": payload.enabled,
-        "emailVerified": True,
-        "credentials": [{"type": "password", "value": payload.password, "temporary": False}],
-    })
+    try:
+        user_id = kc.create_user({
+            "username": payload.username,
+            "email": payload.email,
+            "firstName": payload.firstName,
+            "lastName": payload.lastName,
+            "enabled": payload.enabled,
+            "emailVerified": True,
+            "credentials": [{"type": "password", "value": payload.password, "temporary": False}],
+        })
+    except KeycloakPostError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     if payload.roles:
         role_objs = [kc.get_realm_role(r) for r in payload.roles]
         kc.assign_realm_roles(user_id, role_objs)

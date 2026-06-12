@@ -7,21 +7,12 @@ from app.models.user import TokenUser
 bearer_scheme = HTTPBearer()
 
 
-def _public_key(kc) -> str:
-    raw = kc.public_key()
-    return f"-----BEGIN PUBLIC KEY-----\n{raw}\n-----END PUBLIC KEY-----"
-
-
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
 ) -> TokenUser:
     kc = get_keycloak_openid()
     try:
-        claims = kc.decode_token(
-            credentials.credentials,
-            key=_public_key(kc),
-            options={"verify_exp": True, "verify_aud": False},
-        )
+        claims = kc.decode_token(credentials.credentials)
     except Exception:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
 

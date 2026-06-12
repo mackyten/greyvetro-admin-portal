@@ -7,7 +7,7 @@ class RealmAccess(BaseModel):
 
 
 class TokenUser(BaseModel):
-    sub: str
+    sub: Optional[str] = None
     preferred_username: Optional[str] = None
     email: Optional[str] = None
     realm_access: Optional[RealmAccess] = None
